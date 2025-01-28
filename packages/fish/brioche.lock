@@ -1,0 +1,8 @@
+{
+  "dependencies": {},
+  "git_refs": {
+    "https://github.com/fish-shell/fish-shell.git": {
+      "3.7.1": "80394ea4e38138e0ce0bf23b016dc931e22ff788"
+    }
+  }
+}

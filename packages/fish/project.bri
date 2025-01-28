@@ -1,0 +1,37 @@
+import * as std from "std";
+import { cmakeBuild } from "cmake";
+import pcre2 from "pcre2";
+import { gitCheckout } from "git";
+
+export const project = {
+  name: "fish",
+  version: "3.7.1",
+};
+
+const source = gitCheckout(
+  Brioche.gitRef({
+    repository: "https://github.com/fish-shell/fish-shell.git",
+    ref: project.version,
+  }),
+);
+
+export function toolchain() {
+  return std.toolchain();
+}
+
+export default function fish(): std.Recipe<std.Directory> {
+  const pcre2_dep = pcre2();
+  const toolchain = std.toolchain();
+
+  return cmakeBuild({
+    source,
+    dependencies: [toolchain, pcre2_dep],
+    env: {
+      BUILD_DOCS: "OFF",
+      INSTALL_DOCS: "OFF",
+      CMAKE_PREFIX_PATH: std.tpl`${pcre2_dep}`,
+      CMAKE_INCLUDE_PATH: std.tpl`${toolchain}/include/ncursesw`,
+    },
+    runnable: "bin/fish",
+  });
+}
