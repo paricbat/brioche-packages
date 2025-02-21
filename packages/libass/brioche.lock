@@ -1,0 +1,8 @@
+{
+  "dependencies": {},
+  "git_refs": {
+    "https://github.com/libass/libass.git": {
+      "0.17.3": "e46aedea0a0d17da4c4ef49d84b94a7994664ab5"
+    }
+  }
+}

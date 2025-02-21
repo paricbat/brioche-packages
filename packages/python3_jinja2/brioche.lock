@@ -1,0 +1,8 @@
+{
+  "dependencies": {},
+  "git_refs": {
+    "https://github.com/pallets/jinja.git": {
+      "3.1.5": "877f6e51be8e1765b06d911cfaa9033775f051d1"
+    }
+  }
+}

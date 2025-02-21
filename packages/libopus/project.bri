@@ -1,0 +1,43 @@
+import * as std from "std";
+import { gitCheckout } from "git";
+
+export const project = {
+  name: "libopus",
+  version: "1.5.2",
+};
+
+const source = gitCheckout(
+  Brioche.gitRef({
+    repository: "https://gitlab.xiph.org/xiph/opus.git",
+    ref: `v${project.version}`,
+  }),
+);
+
+// Update with version
+const model_hash = "735117b";
+const model_filename = `opus_data-${model_hash}.tar.gz`;
+const model = std.download({
+  url: `https://media.xiph.org/opus/models/${model_filename}`,
+  hash: std.sha256Hash(
+    "8f34305a299183509d22c7ba66790f67916a0fc56028ebd4c8f7b938458f2801",
+  ),
+});
+
+export default function libopus() {
+  const libopus = std.runBash`
+        sed -i '/dnn\\/download_model\\.sh/d' autogen.sh
+        ./autogen.sh
+        ./configure --prefix=$BRIOCHE_OUTPUT
+        make -j$(nproc) install
+    `
+    .dependencies(std.toolchain())
+    .workDir(source.insert(model_filename, model))
+    .toDirectory()
+    .insert("lib/pkgconfig/libopus.pc", std.symlink({ target: "opus.pc" }));
+
+  return std.setEnv(libopus, {
+    CPATH: { append: [{ path: "include/opus" }] },
+    LIBRARY_PATH: { append: [{ path: "lib" }] },
+    PKG_CONFIG_PATH: { append: [{ path: "lib/pkgconfig" }] },
+  });
+}

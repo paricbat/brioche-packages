@@ -1,0 +1,8 @@
+{
+  "dependencies": {},
+  "git_refs": {
+    "https://github.com/mpv-player/mpv.git": {
+      "v0.39.0": "a0fba7be57f3822d967b04f0f6b6d6341e7516e7"
+    }
+  }
+}

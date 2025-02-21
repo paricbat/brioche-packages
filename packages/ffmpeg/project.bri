@@ -1,0 +1,61 @@
+import * as std from "std";
+import nasm from "nasm";
+import cmake from "cmake";
+import libopus from "libopus";
+import dav1d from "dav1d";
+import openssl from "openssl";
+import libplacebo from "libplacebo";
+import glslang from "glslang";
+
+export const project = {
+  name: "ffmpeg",
+  version: "7.1",
+};
+
+const source = Brioche.download("https://ffmpeg.org/releases/ffmpeg-7.1.tar.xz")
+  .unarchive("tar", "xz")
+  .peel();
+
+export type FFMpegFeature = "libopus" | "libdav1d" | "openssl" | "libplacebo" | "libglslang";
+
+export default function ffmpeg(features?: FFMpegFeature[]) {
+  const fs: FFMpegFeature[] = features ?? [];
+  const configure_args = fs.map((x) => `--enable-${x}`).join(" ");
+  const deps = fs.map((x) => {
+    switch (x) {
+      case "libopus":
+        return libopus();
+      case "libdav1d":
+        return dav1d();
+      case "openssl":
+        return openssl();
+      case "libplacebo":
+        return libplacebo();
+      // Broken: "spirv_compiler" not found
+      // glslang/Include/glslang_c_interface.h: No such file or directory
+      // (it exists in the package, but isn't picked up by the build system)
+      case "libglslang": 
+        return glslang();
+    }
+  });
+
+  const ffmpeg = std.runBash`
+    ./configure --prefix=$BRIOCHE_OUTPUT ${configure_args}
+    make -j$(nproc) install
+
+    ln -s "bin/ffmpeg" $BRIOCHE_OUTPUT/brioche-run
+  `
+    .dependencies(std.toolchain(), nasm(), cmake(), ...deps)
+    .workDir(source)
+    .toDirectory();
+
+  return std.setEnv(ffmpeg, {
+    CPATH: { append: [{ path: "include" }] },
+    LIBRARY_PATH: { append: [{ path: "lib" }] },
+    PKG_CONFIG_PATH: { append: [{ path: "lib/pkgconfig" }] },
+  });
+}
+
+export function allFeatures(): std.Recipe<std.Directory> {
+  return ffmpeg(["libopus", "libdav1d", "openssl", "libplacebo", "libglslang"]);
+}

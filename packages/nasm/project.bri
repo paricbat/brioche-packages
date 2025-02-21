@@ -13,7 +13,7 @@ const source = gitCheckout(
   }),
 );
 
-export default function () {
+export default function nasm(): std.Recipe<std.Directory> {
   return std.runBash`
     ./autogen.sh
     ./configure
@@ -24,5 +24,6 @@ export default function () {
     ln -s "bin/nasm" "$BRIOCHE_OUTPUT/brioche-run"
   `
     .dependencies(std.toolchain())
-    .workDir(source);
+    .workDir(source)
+    .toDirectory();
 }

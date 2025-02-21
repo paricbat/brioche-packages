@@ -1,0 +1,36 @@
+import * as std from "std";
+import { gitCheckout } from "git";
+import { mesonBuild } from "meson";
+import nasm from "nasm";
+
+export const project = {
+  name: "dav1d",
+  version: "1.5.1",
+};
+
+const source = gitCheckout(
+  Brioche.gitRef({
+    repository: "https://code.videolan.org/videolan/dav1d.git",
+    ref: project.version,
+  }),
+);
+
+export default function dav1d(): std.Recipe<std.Directory> {
+  let dav1d = mesonBuild({
+    source,
+    dependencies: [std.toolchain(), nasm()],
+    set: { default_library: "both" },
+  });
+
+  dav1d = std.runBash`
+    sed -i 's/^prefix=.*/prefix=\\\${pcfiledir}\\/..\\/../' "$BRIOCHE_OUTPUT"/lib/pkgconfig/*.pc
+  `
+    .outputScaffold(dav1d)
+    .toDirectory();
+
+  return std.setEnv(dav1d, {
+    CPATH: { append: [{ path: "include/dav1d" }] },
+    LIBRARY_PATH: { append: [{ path: "lib" }] },
+    PKG_CONFIG_PATH: { append: [{ path: "lib/pkgconfig" }] },
+  });
+}

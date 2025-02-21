@@ -1,0 +1,8 @@
+{
+  "dependencies": {},
+  "git_refs": {
+    "https://github.com/mesonbuild/meson": {
+      "1.7.0": "897b6fcdf9adfa87fe60f420e1b483f0f49af7a3"
+    }
+  }
+}

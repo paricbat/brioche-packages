@@ -1,0 +1,52 @@
+import * as std from "std";
+import { gitCheckout } from "git";
+import { mesonBuild } from "meson";
+import python3jinja2 from "python3_jinja2";
+import glslang from "glslang";
+
+export const project = {
+  name: "libplacebo",
+  version: "7.349.0",
+};
+
+const source = gitCheckout(
+  Brioche.gitRef({
+    repository: "https://code.videolan.org/videolan/libplacebo.git",
+    ref: `v${project.version}`,
+  }),
+);
+
+const gladSource = gitCheckout({
+  repository: "https://github.com/Dav1dde/glad.git",
+  commit: "d08b1aa01f8fe57498f04d47b5fa8c48725be877",
+});
+
+const vulkanSource = gitCheckout({
+  repository: "https://github.com/KhronosGroup/Vulkan-Headers.git",
+  commit: "d732b2de303ce505169011d438178191136bfb00",
+});
+
+export default function libplacebo(): std.Recipe<std.Directory> {
+  let src = source.insert("3rdparty/glad", gladSource);
+  src = src.insert("3rdparty/Vulkan-Headers", vulkanSource);
+
+  let result = mesonBuild({
+    source: src,
+    dependencies: [std.toolchain(), python3jinja2(), glslang()],
+    set: {
+      vulkan: "enabled",
+      opengl: "enabled",
+      glslang: "enabled"
+    }
+  });
+
+  result = std.runBash`
+    sed -i 's/^prefix=.*/prefix=\\\${pcfiledir}\\/..\\/../' "$BRIOCHE_OUTPUT"/lib/pkgconfig/*.pc
+  `.outputScaffold(result).toDirectory();
+
+  return std.setEnv(result, {
+    CPATH: { append: [{ path: "include/libplacebo" }] },
+    LIBRARY_PATH: { append: [{ path: "lib" }] },
+    PKG_CONFIG_PATH: { append: [{ path: "lib/pkgconfig" }] },
+  })
+}

@@ -1,0 +1,132 @@
+import * as std from "std";
+import { gitCheckout } from "git";
+import python from "python";
+import nushell from "nushell";
+import ninja from "ninja";
+
+export const project = {
+  name: "meson",
+  version: "1.7.0",
+};
+
+const source = gitCheckout(
+  Brioche.gitRef({
+    repository: "https://github.com/mesonbuild/meson",
+    ref: project.version,
+  }),
+);
+
+export default function meson(): std.Recipe<std.Directory> {
+  const meson = std.runBash`
+    mkdir -p "$BRIOCHE_OUTPUT/bin"
+    ./packaging/create_zipapp.py --outfile "$BRIOCHE_OUTPUT/bin/meson" --interpreter "/usr/bin/env python3" .
+  `
+    .dependencies(python())
+    .workDir(source)
+    .toDirectory();
+
+  // TODO: temporary? workaround
+  return std.merge(meson, python());
+}
+
+export type MesonBuildType =
+  | "plain"
+  | "debug"
+  | "debugoptimized"
+  | "release"
+  | "minsize"
+  | "custom";
+
+export interface MesonBuildOptions {
+  source: std.AsyncRecipe<std.Directory>;
+  dependencies?: std.AsyncRecipe<std.Directory>[];
+  buildtype?: MesonBuildType;
+  env?: Record<string, std.ProcessTemplateLike>;
+  set?: Record<string, string>;
+  runnable?: string;
+}
+
+export function mesonBuild(
+  options: MesonBuildOptions,
+): std.Recipe<std.Directory> {
+  const {
+    source,
+    dependencies = [],
+    buildtype = "release",
+    set = {},
+  } = options;
+
+  const meson_args = Object.entries(set)
+    .map(([name, val]) => `-D${name}="${val}"`)
+    .join(" ");
+
+  let result = std.runBash`
+      meson setup ${meson_args} --buildtype=${buildtype} --prefix "$BRIOCHE_OUTPUT" builddir
+      meson compile --jobs "$(nproc)" -C builddir
+      meson install --no-rebuild -C builddir 
+    `
+    .env({
+      ...options.env,
+    })
+    .workDir(source)
+    .dependencies(meson(), ninja(), ...dependencies)
+    .toDirectory();
+
+  if (options.runnable != null) {
+    result = std.withRunnableLink(result, options.runnable);
+  }
+
+  return result;
+}
+
+export async function test() {
+  const testProj = std.directory({
+    "meson.build": std.file(std.indoc`
+      project('testproj', 'c')
+      executable('testproj', 'main.c', install : true)
+    `),
+    "main.c": std.file(std.indoc`
+      int main(void) { return 0; }
+    `),
+  });
+  const testBuild = mesonBuild({
+    source: testProj,
+    buildtype: "debugoptimized",
+    runnable: "bin/testproj",
+    dependencies: [std.toolchain()],
+  });
+
+  const script = std.runBash`
+    "$testBuild/brioche-run"
+    echo -n "$(meson --version)" | tee "$BRIOCHE_OUTPUT"
+  `
+    .dependencies(meson(), python())
+    .env({
+      testBuild,
+    });
+  const output = await script.toFile().read();
+
+  std.assert(
+    output.startsWith(project.version),
+    `expected version ${project.version}, got ${JSON.stringify(output)}`,
+  );
+
+  return script;
+}
+
+export function autoUpdate() {
+  const src = std.file(std.indoc`
+    let version = http get https://api.github.com/repos/mesonbuild/meson/releases/latest
+      | get tag_name
+      | str replace --regex '^v' ''
+
+    $env.project | from json | update version $version | to json
+  `);
+
+  return std.withRunnable(std.directory(), {
+    command: "nu",
+    args: [src],
+    env: { project: JSON.stringify(project) },
+    dependencies: [nushell()],
+  });
+}

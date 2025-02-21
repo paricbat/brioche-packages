@@ -1,0 +1,8 @@
+{
+  "dependencies": {},
+  "git_refs": {
+    "https://code.videolan.org/videolan/libplacebo.git": {
+      "v7.349.0": "1fd3c7bde7b943fe8985c893310b5269a09b46c5"
+    }
+  }
+}

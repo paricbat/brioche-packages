@@ -1,0 +1,58 @@
+import * as std from "std";
+import { gitCheckout } from "git";
+import { cmakeBuild } from "cmake";
+import certs from "ca_certificates";
+import git from "git";
+import python from "python";
+
+// HACK: This whole thing feels like a hack
+
+export const project = {
+  name: "glslang",
+  version: "15.1.0"
+}
+
+const source = gitCheckout(
+  Brioche.gitRef({
+    repository: "https://github.com/KhronosGroup/glslang.git",
+    ref: project.version,
+  })
+)
+
+const pkgconfigPatch = Brioche.includeFile("./0001-Generate-pkg-config-file-during-install-builds.patch");
+
+export default function glslang(): std.Recipe<std.Directory> {
+  const src = std.runBash`
+    cd "$BRIOCHE_OUTPUT"
+    cat $patch | patch -p1
+    ./update_glslang_sources.py
+  `
+  .outputScaffold(source)
+  .dependencies(python(), git(), certs())
+  .env({
+    patch: pkgconfigPatch
+  })
+  .unsafe({networking: true})
+  .toDirectory();
+
+  let result = cmakeBuild({
+    source: src,
+    dependencies: [std.toolchain(), python()],
+    env: { CMAKE_BUILD_PARALLEL_LEVEL: "8" },
+    set: {
+      GLSLANG_TESTS: "OFF",
+      GLSLANG_ENABLE_INSTALL: "ON",
+    }
+  });
+
+  result = std.runBash`
+    sed -i 's/^prefix=.*/prefix=\\\${pcfiledir}\\/..\\/../' "$BRIOCHE_OUTPUT"/lib/pkgconfig/*.pc
+  `.outputScaffold(result).toDirectory();
+
+  return std.setEnv(result, {
+    CPATH: { append: [{ path: "include/glslang" }, { path: "include/spirv-tools" }] },
+    LIBRARY_PATH: { append: [{ path: "lib" }] },
+    PKG_CONFIG_PATH: { append: [{ path: "lib/pkgconfig" }] },
+    CMAKE_PREFIX_PATH: { append: [{ path: "lib/cmake" }] }
+  });
+}

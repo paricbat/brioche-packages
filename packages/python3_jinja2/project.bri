@@ -1,0 +1,28 @@
+import * as std from "std";
+import python from "python";
+import { gitCheckout } from "git";
+
+export const project = {
+  name: "python3_jinja2",
+  version: "3.1.5",
+};
+
+const source = gitCheckout(Brioche.gitRef({
+  repository: "https://github.com/pallets/jinja.git",
+  ref: project.version,
+}));
+
+export default function(): std.Recipe<std.Directory> {
+  const result = std.runBash`
+    pip install . --prefix "$BRIOCHE_OUTPUT"
+    ln -s "$(ls $BRIOCHE_OUTPUT/lib)" "$BRIOCHE_OUTPUT"/lib/python
+  `
+  .unsafe({ networking: true })
+  .workDir(source)
+  .dependencies(python())
+  .toDirectory();
+
+  return std.setEnv(result, {
+    PYTHONPATH: { append: [{ path: "lib/python/site-packages" }] }
+  })
+}
