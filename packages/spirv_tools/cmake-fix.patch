@@ -1,0 +1,8 @@
+39,45d38
+< 
+<   # Add SPIRV-Headers as a sub-project if it isn't already defined.
+<   # Do this so enclosing projects can use SPIRV-Headers_SOURCE_DIR to find
+<   # headers to include.
+<   if (NOT DEFINED SPIRV-Headers_SOURCE_DIR)
+<     add_subdirectory(${SPIRV_HEADER_DIR})
+<   endif()

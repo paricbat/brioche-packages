@@ -1,0 +1,48 @@
+import * as std from "std";
+import { gitCheckout } from "git";
+import { cmakeBuild } from "cmake";
+import spirv_headers from "spirv_headers";
+import python from "python";
+
+export const project = {
+  name: "spirv_tools",
+  version: "1.5.5",
+};
+
+const source = gitCheckout(
+  Brioche.gitRef({
+    repository: "https://github.com/KhronosGroup/SPIRV-Tools.git",
+    ref: "vulkan-sdk-1.4.304.1",
+  }),
+);
+
+const patch = Brioche.includeFile("./cmake-fix.patch");
+
+export default function spirv_tools(): std.Recipe<std.Directory> {
+  let result = cmakeBuild({
+    source: std.runBash`
+        patch "$BRIOCHE_OUTPUT/external/CMakeLists.txt" "$patch"
+      `
+      .env({
+        patch,
+      })
+      .outputScaffold(source)
+      .toDirectory()
+      .insert("external/spirv-headers", spirv_headers()),
+    dependencies: [std.toolchain(), python()],
+    env: { CMAKE_BUILD_PARALLEL_LEVEL: "8" },
+  });
+
+  result = std.runBash`
+    sed -i 's/^prefix=.*/prefix=\\\${pcfiledir}\\/..\\/../' "$BRIOCHE_OUTPUT"/lib/pkgconfig/*.pc
+  `
+    .outputScaffold(result)
+    .toDirectory();
+
+  return std.setEnv(result, {
+    CPATH: { append: [{ path: "include" }] },
+    LIBRARY_PATH: { append: [{ path: "lib" }] },
+    PKG_CONFIG_PATH: { append: [{ path: "lib/pkgconfig" }] },
+    CMAKE_PREFIX_PATH: { append: [{ path: "lib/cmake" }] },
+  });
+}

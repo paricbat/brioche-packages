@@ -1,58 +1,63 @@
 import * as std from "std";
 import { gitCheckout } from "git";
 import { cmakeBuild } from "cmake";
-import certs from "ca_certificates";
-import git from "git";
 import python from "python";
+import spirv_tools from "spirv_tools";
 
 // HACK: This whole thing feels like a hack
 
 export const project = {
   name: "glslang",
-  version: "15.1.0"
-}
+  version: "15.1.0",
+};
 
 const source = gitCheckout(
   Brioche.gitRef({
     repository: "https://github.com/KhronosGroup/glslang.git",
-    ref: project.version,
-  })
-)
+    ref: "vulkan-sdk-1.4.304.0",
+  }),
+);
 
-const pkgconfigPatch = Brioche.includeFile("./0001-Generate-pkg-config-file-during-install-builds.patch");
+const pkgconfigPatch = Brioche.includeFile(
+  "./0001-pkg-config-compatibility.patch",
+);
 
 export default function glslang(): std.Recipe<std.Directory> {
   const src = std.runBash`
     cd "$BRIOCHE_OUTPUT"
     cat $patch | patch -p1
-    ./update_glslang_sources.py
   `
-  .outputScaffold(source)
-  .dependencies(python(), git(), certs())
-  .env({
-    patch: pkgconfigPatch
-  })
-  .unsafe({networking: true})
-  .toDirectory();
+    .outputScaffold(source)
+    .dependencies(python())
+    .env({
+      patch: pkgconfigPatch,
+    })
+    .toDirectory();
 
   let result = cmakeBuild({
     source: src,
-    dependencies: [std.toolchain(), python()],
+    dependencies: [std.toolchain(), python(), spirv_tools()],
     env: { CMAKE_BUILD_PARALLEL_LEVEL: "8" },
     set: {
       GLSLANG_TESTS: "OFF",
       GLSLANG_ENABLE_INSTALL: "ON",
-    }
+      BUILD_SHARED_LIBS: "OFF",
+    },
   });
 
   result = std.runBash`
-    sed -i 's/^prefix=.*/prefix=\\\${pcfiledir}\\/..\\/../' "$BRIOCHE_OUTPUT"/lib/pkgconfig/*.pc
-  `.outputScaffold(result).toDirectory();
+    sed -i 's/^[ ]*prefix=.*/prefix=\\\${pcfiledir}\\/..\\/../' "$BRIOCHE_OUTPUT"/lib/pkgconfig/*.pc
+    sed -i 's/^[ ]*exec_prefix=.*/exec_prefix=\\\${pcfiledir}\\/..\\/../' "$BRIOCHE_OUTPUT"/lib/pkgconfig/*.pc
+  `
+    .outputScaffold(result)
+    .toDirectory();
 
-  return std.setEnv(result, {
-    CPATH: { append: [{ path: "include/glslang" }, { path: "include/spirv-tools" }] },
+  result = std.setEnv(result, {
+    CPATH: { append: [{ path: "include" }] },
     LIBRARY_PATH: { append: [{ path: "lib" }] },
     PKG_CONFIG_PATH: { append: [{ path: "lib/pkgconfig" }] },
-    CMAKE_PREFIX_PATH: { append: [{ path: "lib/cmake" }] }
+    CMAKE_PREFIX_PATH: { append: [{ path: "lib/cmake" }] },
   });
+
+  return std.withRunnableLink(result, "bin/glslang");
 }

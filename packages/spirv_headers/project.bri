@@ -1,0 +1,35 @@
+import * as std from "std";
+import { gitCheckout } from "git";
+import { cmakeBuild } from "cmake";
+
+export const project = {
+  name: "spirv_headers",
+  version: "1.5.5",
+};
+
+const source = gitCheckout(
+  Brioche.gitRef({
+    repository: "https://github.com/KhronosGroup/SPIRV-Headers.git",
+    ref: "vulkan-sdk-1.4.304.1",
+  }),
+);
+
+export default function spirv_headers(): std.Recipe<std.Directory> {
+  let result = cmakeBuild({
+    source,
+    dependencies: [std.toolchain()],
+  });
+
+  result = std.runBash`
+    sed -i 's/^includedir=.*/includedir=\\\${pcfiledir}\\/..\\/..\\/include/' "$BRIOCHE_OUTPUT"/share/pkgconfig/*.pc
+  `
+    .outputScaffold(result)
+    .toDirectory();
+
+  return std.setEnv(result, {
+    CPATH: { append: [{ path: "include" }] },
+    LIBRARY_PATH: { append: [{ path: "lib" }] },
+    PKG_CONFIG_PATH: { append: [{ path: "share/pkgconfig" }] },
+    CMAKE_PREFIX_PATH: { append: [{ path: "share/cmake" }] },
+  });
+}

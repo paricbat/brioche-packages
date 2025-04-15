@@ -1,0 +1,8 @@
+{
+  "dependencies": {},
+  "git_refs": {
+    "https://github.com/KhronosGroup/SPIRV-Headers.git": {
+      "vulkan-sdk-1.4.304.1": "3f17b2af6784bfa2c5aa5dbb8e0e74a607dd8b3b"
+    }
+  }
+}

@@ -17,8 +17,6 @@ const source = gitCheckout(
 export default function mpv(): std.Recipe<std.Directory> {
   return mesonBuild({
     source,
-    dependencies: [
-      std.toolchain(),
-    ],
+    dependencies: [std.toolchain()],
   });
 }

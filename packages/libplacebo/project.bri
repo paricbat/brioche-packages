@@ -3,6 +3,7 @@ import { gitCheckout } from "git";
 import { mesonBuild } from "meson";
 import python3jinja2 from "python3_jinja2";
 import glslang from "glslang";
+import spirv_tools from "spirv_tools";
 
 export const project = {
   name: "libplacebo",
@@ -32,21 +33,22 @@ export default function libplacebo(): std.Recipe<std.Directory> {
 
   let result = mesonBuild({
     source: src,
-    dependencies: [std.toolchain(), python3jinja2(), glslang()],
+    dependencies: [std.toolchain(), python3jinja2(), glslang(), spirv_tools()],
     set: {
-      vulkan: "enabled",
-      opengl: "enabled",
-      glslang: "enabled"
-    }
+      d3d11: "disabled",
+      demos: "False",
+    },
   });
 
   result = std.runBash`
     sed -i 's/^prefix=.*/prefix=\\\${pcfiledir}\\/..\\/../' "$BRIOCHE_OUTPUT"/lib/pkgconfig/*.pc
-  `.outputScaffold(result).toDirectory();
+  `
+    .outputScaffold(result)
+    .toDirectory();
 
   return std.setEnv(result, {
     CPATH: { append: [{ path: "include/libplacebo" }] },
     LIBRARY_PATH: { append: [{ path: "lib" }] },
     PKG_CONFIG_PATH: { append: [{ path: "lib/pkgconfig" }] },
-  })
+  });
 }

@@ -21,9 +21,9 @@ export default function mpv(): std.Recipe<std.Directory> {
     source,
     dependencies: [
       std.toolchain(),
-      ffmpeg(["libopus", "libdav1d", "openssl"]),
+      ffmpeg(["libopus", "libdav1d", "openssl", "libplacebo", "libglslang"]),
       libplacebo(),
     ],
-    set: { libass: "false" }
+    set: { libass: "false" },
   });
 }

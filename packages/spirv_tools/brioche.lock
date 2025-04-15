@@ -1,0 +1,8 @@
+{
+  "dependencies": {},
+  "git_refs": {
+    "https://github.com/KhronosGroup/SPIRV-Tools.git": {
+      "vulkan-sdk-1.4.304.1": "4d2f0b40bfe290dea6c6904dafdf7fd8328ba346"
+    }
+  }
+}
